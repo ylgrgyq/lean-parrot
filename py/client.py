@@ -9,9 +9,10 @@ from ws4py.manager import WebSocketManager
 wsman = WebSocketManager()
 
 class LeanParrotClient(WebSocketBaseClient):
-    def __init__(self, addr, router):
-
+    def __init__(self, addr, appid, peerid, router):
         WebSocketBaseClient.__init__(self, addr)
+        self.appid = appid
+        self.peerid = peerid
         self._router = router
 
     def handshake_ok(self):
@@ -23,6 +24,8 @@ class LeanParrotClient(WebSocketBaseClient):
         print("Socket opened")
 
     def send(self, m):
+        m['appId'] = self.appid
+        m['peerId'] = self.peerid
         WebSocketBaseClient.send(self, json.dumps(m))
 
     def received_message(self, m):

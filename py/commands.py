@@ -20,3 +20,4 @@ class SessionCommand(AbstractCommand):
 
 def register_all_command(router):
     router.register_command(SessionCommand())
+

@@ -2,10 +2,13 @@
 Hello
 """
 import time
-import commands
-import client
 import fileinput
 import re
+import urllib3
+import commands
+import client
+import config
+import json
 
 class CommandRouter:
     def __init__(self):
@@ -25,25 +28,38 @@ class CommandRouter:
     def sendDownstream(self, msg):
         self._wsClient.send(msg)
 
-if __name__ == "__main__":
+def get_servers(app_id, secure):
+    router_addr = "%s?appId=%s" % (config.ROUTER_URL, app_id)
+    router_addr = "%s&=secure=1" % router_addr if secure else router_addr
+    http = urllib3.PoolManager()
+    resp = http.request('GET', router_addr)
+    if resp.status == 200:
+        data = resp.data
+        return json.loads(data)["server"]
+    else:
+        raise Exception("Get server failed")
 
+if __name__ == "__main__":
+    config.init_config()
+
+    server_addr = get_servers(config.APP_ID, False)
 
     router = CommandRouter()
     commands.register_all_command(router)
 
     client.start_wsman()
-    c = client.LeanParrotClient(addr, router)
+    c = client.LeanParrotClient(server_addr, config.APP_ID, "2a", router)
     c.connect()
 
     try:
-        print("Enter next command in format 'command op k v':")
-        for line in fileinput.input():
-            inputs = re.split("\w+")
+        command = input("Enter command in format 'command op k v':")
+        # print("jkjkjk", command, re.split(r"\w+", command))
+        # [command, *inputs] = re.split(r"\w+", command)
+        print(command, "sdsd")
 
-            print(inputs)
-        c.send({"cmd":"session", "peerId":"2a","appId":"","op":"open","ua":"py/test2"})
-        time.sleep(1)
-        c.close()
+        # c.send({"cmd":"session", "peerId":"2a","appId":"","op":"open","ua":"py/test2"})
+        # time.sleep(1)
+        # c.close()
     except Exception as e:
         print("asdcjvkcjvkcjvkcv", e)
 
