@@ -57,7 +57,6 @@ class ClientBuilder:
         self._addr = None
         self._sub_ptorocol = sub_protocol
         protos = re.split(r'\.', sub_protocol)
-        print("client builder protos", protos, sub_protocol)
         self._protocol = protos[1]
 
     def with_appid(self, appid):

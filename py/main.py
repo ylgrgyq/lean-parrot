@@ -12,18 +12,17 @@ import json
 
 class CommandRouter:
     def __init__(self):
-        self.cmdHandlerDict = dict()
         self._wsClient = None
+        self.command_group = None
 
-    def register_command(self, cmd):
-        self.cmdHandlerDict[cmd.command_name] = cmd
+    def register_command_group(self, command_group):
+        self.command_group = command_group
 
     def register_client(self, client):
         self._wsClient = client
 
     def dispatchUpstream(self, msg):
-        handler = self.cmdHandlerDict.get(msg.get("cmd"))
-        handler.process(self, msg)
+        self.command_group.process(self, msg)
 
     def sendDownstream(self, msg):
         self._wsClient.send(msg)
@@ -37,7 +36,7 @@ def get_servers(app_id, secure):
         data = resp.data
         return json.loads(data)["server"]
     else:
-        raise Exception("Get server failed")
+        raise RuntimeError("Get server failed")
 
 if __name__ == "__main__":
     config.init_config()
@@ -45,23 +44,35 @@ if __name__ == "__main__":
     server_addr = get_servers(config.APP_ID, False)
 
     router = CommandRouter()
-    commands.register_all_command(router)
 
     client.start_wsman()
-    c = client.LeanParrotClient(server_addr, config.APP_ID, "2a", router)
+    c = client.client_builder("lc.json.3") \
+        .with_addr(server_addr) \
+        .with_appid(config.APP_ID) \
+        .with_peerid("2a") \
+        .with_router(router) \
+        .build()
     c.connect()
+
+    commands_group = commands.CommandsGroup()
+    router.register_command_group(commands_group)
 
     try:
         command = input("Enter command in format 'command op k v':")
-        # print("jkjkjk", command, re.split(r"\w+", command))
-        # [command, *inputs] = re.split(r"\w+", command)
-        print(command, "sdsd")
-
-        # c.send({"cmd":"session", "peerId":"2a","appId":"","op":"open","ua":"py/test2"})
-        # time.sleep(1)
-        # c.close()
+        [command, rtm_cmd, *args] = re.split(r"\s+", command)
+        if command != 'quit':
+            i = iter(args)
+            rtm_body = dict(zip(i, i))
+            msg = commands_group.build(rtm_cmd, rtm_body)
+            c.send(msg)
+        else:
+            # c.send({"cmd":"session", "peerId":"2a","appId":"","op":"open","ua":"py/test2"})
+            time.sleep(1)
+            c.close()
     except Exception as e:
-        print("asdcjvkcjvkcjvkcv", e)
+        print("Got exception", e)
 
-    print("asdfasdf")
+    time.sleep(1)
+    print("I'm closing")
+    c.close()
     client.close_wsman()
