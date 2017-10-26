@@ -6,7 +6,7 @@ APP_MASTER_KEY = None
 ROUTER_URL = None
 CLIENT_UA = None
 
-def init_config():
+def init_config(env):
     global APP_KEY
     global APP_ID
     global APP_MASTER_KEY
@@ -16,8 +16,8 @@ def init_config():
     cfg = ConfigParser()
     cfg.read('config.ini')
 
-    APP_ID = cfg.get('prod', "appid")
-    APP_KEY = cfg.get('prod', 'appkey')
-    APP_MASTER_KEY = cfg.get('prod', 'app_master_key')
-    CLIENT_UA = cfg.get('prod', 'ua', fallback='LeanParrot/1.0')
-    ROUTER_URL = "https://%s.%s" % (APP_ID[0:8], cfg.get('prod', 'im_router_addr_url_postfix'))
+    APP_ID = cfg.get(env, "appid")
+    APP_KEY = cfg.get(env, 'appkey')
+    APP_MASTER_KEY = cfg.get(env, 'app_master_key')
+    CLIENT_UA = cfg.get(env, 'ua', fallback='LeanParrot/1.0')
+    ROUTER_URL = "https://%s.%s" % (APP_ID[0:8], cfg.get(env, 'im_router_addr_url_postfix'))

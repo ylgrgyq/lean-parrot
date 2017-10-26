@@ -6,7 +6,7 @@ import json
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 
-wsman = WebSocketManager()
+WS_MANAGER = WebSocketManager()
 
 class Client(WebSocketBaseClient):
     def __init__(self, addr, appid, peerid, router, serializer):
@@ -18,36 +18,36 @@ class Client(WebSocketBaseClient):
 
     def handshake_ok(self):
         print("Handshake OK")
-        wsman.add(self)
+        WS_MANAGER.add(self)
         self._router.register_client(self)
 
     def opened(self):
         print("Socket opened")
 
-    def serialize(self, m):
+    def serialize(self, msg):
         raise NotImplementedError
 
-    def deserialize(self, m):
+    def deserialize(self, msg):
         raise NotImplementedError
 
-    def send(self, m):
-        m['appId'] = self.appid
-        m['peerId'] = self.peerid
-        WebSocketBaseClient.send(self, self._serializer.serialize(m))
+    def send(self, payload, binary=False):
+        payload['appId'] = self.appid
+        payload['peerId'] = self.peerid
+        WebSocketBaseClient.send(self, self._serializer.serialize(payload))
 
-    def received_message(self, m):
-        print("Received msg", m)
-        self._router.dispatchUpstream(self._serializer.deserialize(m))
+    def received_message(self, message):
+        print("Received msg", message)
+        self._router.dispatchUpstream(self._serializer.deserialize(message))
 
-    def closed(self, status, reason):
-        print("WebSocket closed", status, reason)
+    def closed(self, code, reason=None):
+        print("WebSocket closed", code, reason)
 
 class JsonSerializer:
-    def serialize(self, m):
-        return json.dumps(m)
+    def serialize(self, msg):
+        return json.dumps(msg)
 
-    def deserialize(self, m):
-        return json.loads(str(m))
+    def deserialize(self, msg):
+        return json.loads(str(msg))
 
 class ClientBuilder:
     def __init__(self, sub_protocol):
@@ -76,20 +76,18 @@ class ClientBuilder:
         return self
 
     def build(self):
-        serializer = None
+        serializer = JsonSerializer()
         if self._protocol == 'json':
             serializer = JsonSerializer()
-        else:
-            serializer = JsonSerializer()
-        return Client(self._addr, self._appid, self._peerid, self._router, JsonSerializer())
+        return Client(self._addr, self._appid, self._peerid, self._router, serializer)
 
 def client_builder(sub_protocol):
     return ClientBuilder(sub_protocol)
 
 def start_wsman():
-    wsman.start()
+    WS_MANAGER.start()
 
 def close_wsman():
-    wsman.close_all()
-    wsman.stop()
-    wsman.join()
+    WS_MANAGER.close_all()
+    WS_MANAGER.stop()
+    WS_MANAGER.join()
