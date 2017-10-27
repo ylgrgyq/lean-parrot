@@ -2,6 +2,8 @@
 Hello
 """
 import time
+import re
+
 import hmac
 import hashlib
 
@@ -18,11 +20,11 @@ class SignatureMixin:
         nonce = cmd_msg.get('nonce', util.generate_id())
         peerid = peerid if convid is None else ':'.join([peerid, convid])
         peerids = '' if peerids is None else ':'.join(sorted(peerids))
-        sign_msg = ':'.join([config.APP_ID, peerid, peerids, ts, nonce])
+        sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts), nonce])
         sign_msg = sign_msg if action is None else ':'.join([sign_msg, action])
         cmd_msg['t'] = ts
         cmd_msg['n'] = nonce
-        cmd_msg['s'] = sign_msg
+        cmd_msg['s'] = self.sign(sign_msg, config.APP_MASTER_KEY)
         return cmd_msg
 
 class Command:
@@ -34,7 +36,7 @@ class Command:
         return self._name
 
     def process(self, router, msg):
-        print("Receive msg %s" % msg)
+        print("< ", msg)
 
     def add(self, sub_command):
         raise NotImplementedError
@@ -59,10 +61,10 @@ class CommandWithOp(Command):
 
     def process(self, router, msg):
         op = msg.get('op')
-        if op is not None:
-            self.sub_commands[op].process(router, msg)
-        else:
+        if op is None or op not in self.sub_commands:
             super().process(router, msg)
+        else:
+            self.sub_commands[op].process(router, msg)
 
     def build(self, cmd_msg):
         op = cmd_msg.get('op')
@@ -90,6 +92,9 @@ class ConvStartCommand(Command, SignatureMixin):
         super().__init__(ConvStartCommand._op_name)
     def build(self, cmd_msg):
         members = cmd_msg['m']
+        members = re.split(r',', members)
+        cmd_msg['m'] = members
+        cmd_msg['unique'] = cmd_msg.get('unique', True)
         return self.add_sign(cmd_msg, peerids=members)
 
 class ConvAddCommand(Command, SignatureMixin):
@@ -99,6 +104,8 @@ class ConvAddCommand(Command, SignatureMixin):
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
+        members = re.split(r',', members)
+        cmd_msg['m'] = members
         return self.add_sign(cmd_msg, convid=cid, peerids=members)
 
 class ConvRemoveCommand(Command, SignatureMixin):
@@ -108,6 +115,8 @@ class ConvRemoveCommand(Command, SignatureMixin):
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
+        members = re.split(r',', members)
+        cmd_msg['m'] = members
         return self.add_sign(cmd_msg, convid=cid, peerids=members)
 
 class SessionCommand(CommandWithOp):
@@ -148,14 +157,14 @@ class CommandsManager:
         cmd = register_session_commands()
         self.commands = {cmd.name: cmd}
         cmd = register_conv_commands()
-        self.commands = {cmd.name: cmd}
+        self.commands[cmd.name] = cmd
 
     def process(self, router, msg):
         cmd_in_msg = msg.get('cmd')
         if cmd_in_msg is not None:
             cmd = self.commands.get(cmd_in_msg)
             if cmd is None:
-                print("Receive msg %s" % msg)
+                print("< ", msg)
             else:
                 cmd.process(router, msg)
         else:

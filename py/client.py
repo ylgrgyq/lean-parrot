@@ -10,7 +10,7 @@ WS_MANAGER = WebSocketManager()
 
 class Client(WebSocketBaseClient):
     def __init__(self, addr, appid, peerid, router, serializer):
-        WebSocketBaseClient.__init__(self, addr)
+        super().__init__(addr)
         self.appid = appid
         self.peerid = peerid
         self._router = router
@@ -33,11 +33,11 @@ class Client(WebSocketBaseClient):
     def send(self, payload, binary=False):
         payload['appId'] = self.appid
         payload['peerId'] = self.peerid
-        WebSocketBaseClient.send(self, self._serializer.serialize(payload))
+        print("> ", payload)
+        super().send(self._serializer.serialize(payload))
 
     def received_message(self, message):
-        print("Received msg", message)
-        self._router.dispatchUpstream(self._serializer.deserialize(message))
+        self._router.dispatch_upstream(self._serializer.deserialize(message))
 
     def closed(self, code, reason=None):
         print("WebSocket closed", code, reason)

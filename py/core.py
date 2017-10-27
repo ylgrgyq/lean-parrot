@@ -5,6 +5,7 @@ import re
 import json
 import traceback
 import urllib3
+import readline
 
 import commands
 import client
@@ -59,7 +60,8 @@ def start_process():
     router.register_commands_manager(command_manager)
 
     while True:
-        raw_str = input("Enter command in format 'command op k v':")
+        # raw_str = input("Enter command in format 'command op k v':")
+        raw_str = input()
         [command, cmd, *args] = re.split(r"\s+", raw_str)
         if command != 'quit':
             try:
