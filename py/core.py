@@ -10,6 +10,7 @@ import readline
 import commands
 import client
 import config
+import input_parser
 
 class CommandRouter:
     def __init__(self):
@@ -62,17 +63,13 @@ def start_process():
     while True:
         # raw_str = input("Enter command in format 'command op k v':")
         raw_str = input()
-        [command, cmd, *args] = re.split(r"\s+", raw_str)
-        if command != 'quit':
-            try:
-                i = iter(args)
-                cmd_msg = dict(zip(i, i))
-                msg = command_manager.build(cmd, cmd_msg)
-                clt.send(msg)
-            except Exception as exc:
-                print("Got exception", traceback.print_exc())
-        else:
-            break
+        [command, cmd, args] = re.split(r"\s+", raw_str, maxsplit=2)
+        try:
+            cmd_msg = input_parser.parse_input_cmd_args(args)
+            msg = command_manager.build(cmd, cmd_msg)
+            clt.send(msg)
+        except Exception as exc:
+            print("Got exception", traceback.print_exc())
 
     clt.close()
     client.close_wsman()

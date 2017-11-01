@@ -92,8 +92,6 @@ class ConvStartCommand(Command, SignatureMixin):
         super().__init__(ConvStartCommand._op_name)
     def build(self, cmd_msg):
         members = cmd_msg['m']
-        members = re.split(r',', members)
-        cmd_msg['m'] = members
         cmd_msg['unique'] = cmd_msg.get('unique', True)
         return self.add_sign(cmd_msg, peerids=members)
 
@@ -104,8 +102,6 @@ class ConvAddCommand(Command, SignatureMixin):
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
-        members = re.split(r',', members)
-        cmd_msg['m'] = members
         return self.add_sign(cmd_msg, convid=cid, peerids=members)
 
 class ConvRemoveCommand(Command, SignatureMixin):
@@ -115,8 +111,8 @@ class ConvRemoveCommand(Command, SignatureMixin):
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
-        members = re.split(r',', members)
-        cmd_msg['m'] = members
+        # members = re.split(r',', members)
+        # cmd_msg['m'] = members
         return self.add_sign(cmd_msg, convid=cid, peerids=members)
 
 class SessionCommand(CommandWithOp):
@@ -171,8 +167,9 @@ class CommandsManager:
             raise RuntimeError("Receive msg without 'cmd': %s" % msg)
 
     def build(self, cmd, cmd_msg):
-        cmd = self.commands.get(cmd)
-        if cmd is None:
+        cmd_builder = self.commands.get(cmd)
+        if cmd_builder is None:
+            cmd_msg['cmd'] = cmd
             return cmd_msg
         else:
-            return cmd.build(cmd_msg)
+            return cmd_builder.build(cmd_msg)

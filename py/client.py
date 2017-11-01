@@ -24,12 +24,6 @@ class Client(WebSocketBaseClient):
     def opened(self):
         print("Socket opened")
 
-    def serialize(self, msg):
-        raise NotImplementedError
-
-    def deserialize(self, msg):
-        raise NotImplementedError
-
     def send(self, payload, binary=False):
         payload['appId'] = self.appid
         payload['peerId'] = self.peerid
