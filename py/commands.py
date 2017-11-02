@@ -2,7 +2,6 @@
 Hello
 """
 import time
-import re
 
 import hmac
 import hashlib
@@ -111,8 +110,6 @@ class ConvRemoveCommand(Command, SignatureMixin):
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
-        # members = re.split(r',', members)
-        # cmd_msg['m'] = members
         return self.add_sign(cmd_msg, convid=cid, peerids=members)
 
 class SessionCommand(CommandWithOp):

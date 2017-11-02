@@ -4,8 +4,9 @@ Hello
 import re
 import json
 import traceback
-import urllib3
 import readline
+import urllib3
+import argparse
 
 import commands
 import client
@@ -43,16 +44,26 @@ def get_servers(app_id, secure):
 
 def start_process():
     """Driver function to run this script"""
-    config.init_config('prod')
-    server_addr = get_servers(config.APP_ID, False)
+    parser = argparse.ArgumentParser(description="Command line client to comunicate with IM")
+    parser.add_argument('--peerid', default='2a', dest="peerid", help="client peerId")
+    parser.add_argument('--protocol', default='lc.json.3', dest="protocol", help="IM protocol code")
+    parser.add_argument('--env', default='prod', dest="config_env",
+                        help="Which config env to use")
+    parser.add_argument('--in-secure', action="store_false", default=True, dest="is_secure_addr",
+                        help="Use in secure websocket addr")
+    args = parser.parse_args()
+
+    config.init_config(args.config_env)
+    server_addr = get_servers(config.APP_ID, args.is_secure_addr)
+    print("Connecting to %s" % server_addr)
 
     router = CommandRouter()
 
     client.start_wsman()
-    clt = client.client_builder("lc.json.3") \
+    clt = client.client_builder(args.protocol) \
         .with_addr(server_addr) \
         .with_appid(config.APP_ID) \
-        .with_peerid("2a") \
+        .with_peerid(args.peerid) \
         .with_router(router) \
         .build()
     clt.connect()
@@ -63,12 +74,12 @@ def start_process():
     while True:
         # raw_str = input("Enter command in format 'command op k v':")
         raw_str = input()
-        [command, cmd, args] = re.split(r"\s+", raw_str, maxsplit=2)
+        [cmd, args] = re.split(r"\s+", raw_str, maxsplit=1)
         try:
             cmd_msg = input_parser.parse_input_cmd_args(args)
             msg = command_manager.build(cmd, cmd_msg)
             clt.send(msg)
-        except Exception as exc:
+        except Exception:
             print("Got exception", traceback.print_exc())
 
     clt.close()
