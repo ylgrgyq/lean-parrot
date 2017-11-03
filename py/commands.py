@@ -163,7 +163,8 @@ class CommandsManager:
         else:
             raise RuntimeError("Receive msg without 'cmd': %s" % msg)
 
-    def build(self, cmd, cmd_msg):
+    def build(self, cmd_msg):
+        cmd = cmd_msg['cmd']
         cmd_builder = self.commands.get(cmd)
         if cmd_builder is None:
             cmd_msg['cmd'] = cmd

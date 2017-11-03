@@ -1,4 +1,6 @@
-
+"""
+    Functions to parse input from command line
+"""
 import json
 
 def skip_whitespaces(pos, a_str):

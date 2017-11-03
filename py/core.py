@@ -49,7 +49,7 @@ def start_process():
     parser.add_argument('--protocol', default='lc.json.3', dest="protocol", help="IM protocol code")
     parser.add_argument('--env', default='prod', dest="config_env",
                         help="Which config env to use")
-    parser.add_argument('--in-secure', action="store_false", default=True, dest="is_secure_addr",
+    parser.add_argument('--secure', action="store_true", default=True, dest="is_secure_addr",
                         help="Use in secure websocket addr")
     args = parser.parse_args()
 
@@ -59,8 +59,11 @@ def start_process():
 
     router = CommandRouter()
 
+    command_manager = commands.CommandsManager()
+    router.register_commands_manager(command_manager)
+
     client.start_wsman()
-    clt = client.client_builder(args.protocol) \
+    clt = client.client_builder(args.protocol, command_manager) \
         .with_addr(server_addr) \
         .with_appid(config.APP_ID) \
         .with_peerid(args.peerid) \
@@ -68,17 +71,12 @@ def start_process():
         .build()
     clt.connect()
 
-    command_manager = commands.CommandsManager()
-    router.register_commands_manager(command_manager)
-
     while True:
-        # raw_str = input("Enter command in format 'command op k v':")
+        # raw_str = input("Enter command in format 'op k v':")
         raw_str = input()
-        [cmd, args] = re.split(r"\s+", raw_str, maxsplit=1)
         try:
-            cmd_msg = input_parser.parse_input_cmd_args(args)
-            msg = command_manager.build(cmd, cmd_msg)
-            clt.send(msg)
+            cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
+            clt.send(cmd_msg_args)
         except Exception:
             print("Got exception", traceback.print_exc())
 
