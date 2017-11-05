@@ -13,23 +13,6 @@ import client
 import config
 import input_parser
 
-class CommandRouter:
-    def __init__(self):
-        self._client = None
-        self._commands_manager = None
-
-    def register_commands_manager(self, manager):
-        self._commands_manager = manager
-
-    def register_client(self, clt):
-        self._client = clt
-
-    def dispatch_upstream(self, msg):
-        self._commands_manager.process(self, msg)
-
-    def send_downstream(self, msg):
-        self._client.send(msg)
-
 def get_servers(app_id, secure):
     """Get RTM server address"""
     router_addr = "%s?appId=%s" % (config.ROUTER_URL, app_id)
@@ -57,22 +40,15 @@ def start_process():
     server_addr = get_servers(config.APP_ID, args.is_secure_addr)
     print("Connecting to %s" % server_addr)
 
-    router = CommandRouter()
-
-    command_manager = commands.CommandsManager()
-    router.register_commands_manager(command_manager)
-
     client.start_wsman()
-    clt = client.client_builder(args.protocol, command_manager) \
+    clt = client.client_builder(args.protocol) \
         .with_addr(server_addr) \
         .with_appid(config.APP_ID) \
         .with_peerid(args.peerid) \
-        .with_router(router) \
         .build()
     clt.connect()
 
     while True:
-        # raw_str = input("Enter command in format 'op k v':")
         raw_str = input()
         try:
             cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)

@@ -9,22 +9,21 @@ import hashlib
 import util
 import config
 
-class SignatureMixin:
-    def sign(self, sign_msg, k):
-        return hmac.new(k.encode('utf-8'), sign_msg.encode('utf-8'), hashlib.sha1).digest().hex()
+def sign(sign_msg, k):
+    return hmac.new(k.encode('utf-8'), sign_msg.encode('utf-8'), hashlib.sha1).digest().hex()
 
-    def add_sign(self, cmd_msg, convid=None, action=None, peerids=None):
-        peerid = cmd_msg['peerId']
-        ts = time.time()
-        nonce = cmd_msg.get('nonce', util.generate_id())
-        peerid = peerid if convid is None else ':'.join([peerid, convid])
-        peerids = '' if peerids is None else ':'.join(sorted(peerids))
-        sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts), nonce])
-        sign_msg = sign_msg if action is None else ':'.join([sign_msg, action])
-        cmd_msg['t'] = ts
-        cmd_msg['n'] = nonce
-        cmd_msg['s'] = self.sign(sign_msg, config.APP_MASTER_KEY)
-        return cmd_msg
+def add_sign(cmd_msg, convid=None, action=None, peerids=None):
+    peerid = cmd_msg['peerId']
+    ts = time.time()
+    nonce = cmd_msg.get('nonce', util.generate_id())
+    peerid = peerid if convid is None else ':'.join([peerid, convid])
+    peerids = '' if peerids is None else ':'.join(sorted(peerids))
+    sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts), nonce])
+    sign_msg = sign_msg if action is None else ':'.join([sign_msg, action])
+    cmd_msg['t'] = ts
+    cmd_msg['n'] = nonce
+    cmd_msg['s'] = sign(sign_msg, config.APP_MASTER_KEY)
+    return cmd_msg
 
 class Command:
     def __init__(self, name):
@@ -37,14 +36,11 @@ class Command:
     def process(self, router, msg):
         print("< ", msg)
 
-    def add(self, sub_command):
-        raise NotImplementedError
-
-    def remove(self, sub_command):
-        raise NotImplementedError
-
     def build(self, cmd_msg):
         return cmd_msg
+
+    def is_interactive_cmd(self):
+        return True
 
 class CommandWithOp(Command):
     def __init__(self, name):
@@ -85,45 +81,45 @@ class ConvCommand(CommandWithOp):
     def __init__(self):
         super().__init__(ConvCommand._name)
 
-class ConvStartCommand(Command, SignatureMixin):
+class ConvStartCommand(Command):
     _op_name = "start"
     def __init__(self):
         super().__init__(ConvStartCommand._op_name)
     def build(self, cmd_msg):
         members = cmd_msg['m']
         cmd_msg['unique'] = cmd_msg.get('unique', True)
-        return self.add_sign(cmd_msg, peerids=members)
+        return add_sign(cmd_msg, peerids=members)
 
-class ConvAddCommand(Command, SignatureMixin):
+class ConvAddCommand(Command):
     _op_name = "add"
     def __init__(self):
         super().__init__(ConvAddCommand._op_name)
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
-        return self.add_sign(cmd_msg, convid=cid, peerids=members)
+        return add_sign(cmd_msg, convid=cid, peerids=members)
 
-class ConvRemoveCommand(Command, SignatureMixin):
+class ConvRemoveCommand(Command):
     _op_name = "remove"
     def __init__(self):
         super().__init__(ConvRemoveCommand._op_name)
     def build(self, cmd_msg):
         cid = cmd_msg['cid']
         members = cmd_msg['m']
-        return self.add_sign(cmd_msg, convid=cid, peerids=members)
+        return add_sign(cmd_msg, convid=cid, peerids=members)
 
 class SessionCommand(CommandWithOp):
     _name = "session"
     def __init__(self):
         super().__init__(SessionCommand._name)
 
-class SessionOpenCommand(Command, SignatureMixin):
+class SessionOpenCommand(Command):
     _op_name = "open"
     def __init__(self):
         super().__init__(SessionOpenCommand._op_name)
 
     def build(self, cmd_msg):
-        cmd_msg = self.add_sign(cmd_msg)
+        cmd_msg = add_sign(cmd_msg)
         cmd_msg['ua'] = cmd_msg.get('ua', config.CLIENT_UA)
         return cmd_msg
 
@@ -146,11 +142,14 @@ def register_conv_commands():
     return session_cmd
 
 class CommandsManager:
-    def __init__(self):
+    def __init__(self, appid, peerid):
         cmd = register_session_commands()
         self.commands = {cmd.name: cmd}
         cmd = register_conv_commands()
         self.commands[cmd.name] = cmd
+        self._next_serial_id = 1
+        self._appid = appid
+        self._peerid = peerid
 
     def process(self, router, msg):
         cmd_in_msg = msg.get('cmd')
@@ -170,4 +169,10 @@ class CommandsManager:
             cmd_msg['cmd'] = cmd
             return cmd_msg
         else:
-            return cmd_builder.build(cmd_msg)
+            cmd_msg['appId'] = self._appid
+            cmd_msg['peerId'] = self._peerid
+            msg = cmd_builder.build(cmd_msg)
+            if cmd_builder.is_interactive_cmd():
+                msg['i'] = self._next_serial_id
+                self._next_serial_id += 1
+            return msg
