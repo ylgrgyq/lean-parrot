@@ -32,12 +32,16 @@ def start_process():
     parser.add_argument('--protocol', default='lc.json.3', dest="protocol", help="IM protocol code")
     parser.add_argument('--env', default='prod', dest="config_env",
                         help="Which config env to use")
+    parser.add_argument('--addr', default=None, dest="server_addr",
+                        help="Server address connecting to")
     parser.add_argument('--secure', action="store_true", default=True, dest="is_secure_addr",
                         help="Use in secure websocket addr")
     args = parser.parse_args()
 
     config.init_config(args.config_env)
-    server_addr = get_servers(config.APP_ID, args.is_secure_addr)
+    server_addr = args.server_addr
+    if server_addr is None:
+        server_addr = get_servers(config.APP_ID, args.is_secure_addr)
     print("Connecting to %s" % server_addr)
 
     client.start_wsman()

@@ -24,7 +24,7 @@ class Client(WebSocketBaseClient):
 
     def send(self, cmd_msg_args):
         msg = self._cmd_manager.build(cmd_msg_args)
-        print("> ", msg)
+        print("> ", json.dumps(msg))
         super().send(self._serializer.serialize(msg))
 
     def received_message(self, message):
