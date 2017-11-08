@@ -82,16 +82,49 @@ class CommandWithOp(Command):
         msg['cmd'] = self.name
         return msg
 
+COMMANDS = dict()
+
+def register_command(parent_name = None):
+    def wrapper(cls):
+        if parent_name is None:
+            parents = COMMANDS.get('_parents', list())
+            parents.append(cls)
+            COMMANDS['_parents'] = parents
+        else:
+            sub_cmds = COMMANDS.get('_subcmds', dict())
+            cmds = sub_cmds.get(parent_name, list())
+            cmds.append(cls)
+            sub_cmds[parent_name] = cmds
+            COMMANDS['_subcmds'] = sub_cmds
+        return cls
+    return wrapper
+
+def init_commands():
+    commands = dict()
+    for parent_cls in COMMANDS.get('_parents'):
+        cmd = parent_cls()
+        commands[cmd.name] = cmd
+
+    for parent_name, cmd_classes in COMMANDS.get('_subcmds', dict()).items():
+        for cmd_cls in cmd_classes:
+            cmd = cmd_cls()
+            parent_cmd = commands[parent_name]
+            parent_cmd.add(cmd)
+    return commands
+
+@register_command()
 class DirectCommand(Command):
     _name = "direct"
     def __init__(self):
         super().__init__(DirectCommand._name)
 
+@register_command()
 class ConvCommand(CommandWithOp):
     _name = "conv"
     def __init__(self):
         super().__init__(ConvCommand._name)
 
+@register_command(parent_name = "conv")
 class ConvStartCommand(Command):
     _op_name = "start"
     def __init__(self):
@@ -102,6 +135,7 @@ class ConvStartCommand(Command):
         cmd_msg['unique'] = cmd_msg.get('unique', True)
         return cmd_msg
 
+@register_command(parent_name = "conv")
 class ConvAddCommand(Command):
     _op_name = "add"
     def __init__(self):
@@ -111,6 +145,7 @@ class ConvAddCommand(Command):
     def build(self, cmd_msg):
         return cmd_msg
 
+@register_command(parent_name = "conv")
 class ConvRemoveCommand(Command):
     _op_name = "remove"
     def __init__(self):
@@ -120,11 +155,13 @@ class ConvRemoveCommand(Command):
     def build(self, cmd_msg):
         return cmd_msg
 
+@register_command()
 class SessionCommand(CommandWithOp):
     _name = "session"
     def __init__(self):
         super().__init__(SessionCommand._name)
 
+@register_command(parent_name = "session")
 class SessionOpenCommand(Command):
     _op_name = "open"
     def __init__(self):
@@ -136,32 +173,15 @@ class SessionOpenCommand(Command):
         cmd_msg['configBitmap'] = 0xFFFF
         return cmd_msg
 
+@register_command(parent_name = "session")
 class SessionCloseCommand(Command):
     _op_name = "close"
     def __init__(self):
         super().__init__(SessionCloseCommand._op_name)
 
-def register_session_commands():
-    session_cmd = SessionCommand()
-    session_cmd.add(SessionOpenCommand())
-    session_cmd.add(SessionCloseCommand())
-
-    return session_cmd
-
-def register_conv_commands():
-    conv_cmd = ConvCommand()
-    conv_cmd.add(ConvStartCommand())
-    conv_cmd.add(ConvAddCommand())
-    conv_cmd.add(ConvRemoveCommand())
-
-    return conv_cmd
-
 class CommandsManager:
     def __init__(self, appid, peerid):
-        cmd = register_session_commands()
-        self.commands = {cmd.name: cmd}
-        cmd = register_conv_commands()
-        self.commands[cmd.name] = cmd
+        self.commands = init_commands()
         self._next_serial_id = 1
         self._appid = appid
         self._peerid = peerid
