@@ -1,5 +1,5 @@
 """
-    Functions to parse input from command line
+Functions to parse input from command line
 """
 import json
 

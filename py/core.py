@@ -1,12 +1,11 @@
 """
 Hello
 """
-import re
 import json
 import traceback
 import readline
-import urllib3
 import argparse
+import urllib3
 
 import commands
 import client
@@ -31,11 +30,11 @@ def start_process():
     parser.add_argument('--peerid', default='2a', dest="peerid", help="client peerId")
     parser.add_argument('--protocol', default='lc.json.3', dest="protocol", help="IM protocol code")
     parser.add_argument('--env', default='prod', dest="config_env",
-                        help="Which config env to use")
+                        help="Which env in config.ini to use")
     parser.add_argument('--addr', default=None, dest="server_addr",
                         help="Server address connecting to")
     parser.add_argument('--secure', action="store_true", default=True, dest="is_secure_addr",
-                        help="Use in secure websocket addr")
+                        help="Use secure websocket addr")
     args = parser.parse_args()
 
     config.init_config(args.config_env)
