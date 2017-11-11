@@ -79,13 +79,13 @@ def try_parse_boolean(pos, input_str):
     if cursor + 4 <= input_len and \
        input_str[cursor:cursor + 4].lower() == 'true' and \
        char_is_space_or_out_of_string(cursor + 4, input_str):
-       cursor += 4
-       ret = True
+        cursor += 4
+        ret = True
     elif cursor + 5 <= input_len and \
          input_str[cursor:cursor + 5].lower() == 'false' and \
          char_is_space_or_out_of_string(cursor + 5, input_str):
-         cursor += 5
-         ret = False
+        cursor += 5
+        ret = False
 
     if cursor == pos:
         return parse_value_as_string(pos, input_str)
