@@ -1,5 +1,5 @@
 """
-Hello
+Build command or parse command
 """
 import time
 import json

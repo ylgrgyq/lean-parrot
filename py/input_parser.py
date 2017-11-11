@@ -61,6 +61,38 @@ def parse_string(pos, input_str):
         cursor = skip_whitespaces(cursor + 1, input_str)
     return [cursor, ret_str]
 
+def parse_value_as_string(pos, input_str):
+    cursor = pos
+    while cursor < len(input_str) \
+          and not input_str[cursor].isspace() \
+          and input_str[cursor] not in ['}', ']']:
+        cursor += 1
+    return [skip_whitespaces(cursor, input_str), input_str[pos:cursor]]
+
+def char_is_space_or_out_of_string(char_pos, input_str):
+    return char_pos >= len(input_str) or input_str[char_pos].isspace()
+
+def try_parse_boolean(pos, input_str):
+    cursor = pos
+    input_len = len(input_str)
+    ret = None
+    if cursor + 4 <= input_len and \
+       input_str[cursor:cursor + 4].lower() == 'true' and \
+       char_is_space_or_out_of_string(cursor + 4, input_str):
+       cursor += 4
+       ret = True
+    elif cursor + 5 <= input_len and \
+         input_str[cursor:cursor + 5].lower() == 'false' and \
+         char_is_space_or_out_of_string(cursor + 5, input_str):
+         cursor += 5
+         ret = False
+
+    if cursor == pos:
+        return parse_value_as_string(pos, input_str)
+    else:
+        cursor = skip_whitespaces(cursor, input_str)
+        return [cursor, ret]
+
 def parse_value_from_input(pos, input_str):
     cursor = pos
     if input_str[cursor] == '{':
@@ -69,12 +101,10 @@ def parse_value_from_input(pos, input_str):
         return parse_list(cursor, input_str)
     elif input_str[cursor] in ['\'', '\"']:
         return parse_string(cursor, input_str)
+    elif input_str[cursor].lower() in ['t', 'f']:
+        return try_parse_boolean(cursor, input_str)
     else:
-        while cursor < len(input_str) \
-              and not input_str[cursor].isspace() \
-              and input_str[cursor] not in ['}', ']']:
-            cursor += 1
-        return [skip_whitespaces(cursor, input_str), input_str[pos:cursor]]
+        return parse_value_as_string(cursor, input_str)
 
 def parse_input_cmd_args(input_str):
     ret = dict()
