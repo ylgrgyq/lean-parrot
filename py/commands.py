@@ -82,30 +82,45 @@ class CommandWithOp(Command):
         msg['cmd'] = self.name
         return msg
 
-COMMANDS = dict()
+class RegisteredCommands:
+    def __init__(self):
+        self._parents = list()
+        self._childs = dict()
+
+    def add_parent_cmd_cls(self, cmd_cls):
+        self._parents.append(cmd_cls)
+
+    def add_child_cmd_cls(self, parent_name, cmd_cls):
+        childs = self._childs.get(parent_name, list())
+        childs.append(cmd_cls)
+        self._childs[parent_name] = childs
+
+    def parent_cmd_cls_gen(self):
+        for cmd_cls in self._parents:
+            yield cmd_cls
+
+    def child_cmd_cls_gen(self):
+        for parent_name, cmd_cls in self._childs.items():
+            yield [parent_name, cmd_cls]
+
+COMMANDS = RegisteredCommands()
 
 def register_command(parent_name = None):
     def wrapper(cls):
         if parent_name is None:
-            parents = COMMANDS.get('_parents', list())
-            parents.append(cls)
-            COMMANDS['_parents'] = parents
+            COMMANDS.add_parent_cmd_cls(cls)
         else:
-            sub_cmds = COMMANDS.get('_subcmds', dict())
-            cmds = sub_cmds.get(parent_name, list())
-            cmds.append(cls)
-            sub_cmds[parent_name] = cmds
-            COMMANDS['_subcmds'] = sub_cmds
+            COMMANDS.add_child_cmd_cls(parent_name, cls)
         return cls
     return wrapper
 
 def init_commands():
     commands = dict()
-    for parent_cls in COMMANDS.get('_parents'):
+    for parent_cls in COMMANDS.parent_cmd_cls_gen():
         cmd = parent_cls()
         commands[cmd.name] = cmd
 
-    for parent_name, cmd_classes in COMMANDS.get('_subcmds', dict()).items():
+    for parent_name, cmd_classes in COMMANDS.child_cmd_cls_gen():
         for cmd_cls in cmd_classes:
             cmd = cmd_cls()
             parent_cmd = commands[parent_name]
