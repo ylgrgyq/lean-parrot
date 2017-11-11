@@ -3,9 +3,9 @@ webSocket Client
 """
 import re
 import json
+import commands
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
-import commands
 
 WS_MANAGER = WebSocketManager()
 
@@ -22,7 +22,7 @@ class Client(WebSocketBaseClient):
     def opened(self):
         print("Socket opened")
 
-    def send(self, cmd_msg_args):
+    def send_msg(self, cmd_msg_args):
         msg = self._cmd_manager.build(cmd_msg_args)
         print("> ", json.dumps(msg))
         super().send(self._serializer.serialize(msg))

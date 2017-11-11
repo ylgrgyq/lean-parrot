@@ -55,7 +55,7 @@ def start_process():
         raw_str = input()
         try:
             cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
-            clt.send(cmd_msg_args)
+            clt.send_msg(cmd_msg_args)
         except Exception:
             print("Got exception", traceback.print_exc())
 

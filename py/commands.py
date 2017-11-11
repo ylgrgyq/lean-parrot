@@ -105,7 +105,7 @@ class RegisteredCommands:
 
 COMMANDS = RegisteredCommands()
 
-def register_command(parent_name = None):
+def register_command(parent_name=None):
     def wrapper(cls):
         if parent_name is None:
             COMMANDS.add_parent_cmd_cls(cls)
@@ -139,7 +139,7 @@ class ConvCommand(CommandWithOp):
     def __init__(self):
         super().__init__(ConvCommand._name)
 
-@register_command(parent_name = "conv")
+@register_command(parent_name="conv")
 class ConvStartCommand(Command):
     _op_name = "start"
     def __init__(self):
@@ -150,7 +150,7 @@ class ConvStartCommand(Command):
         cmd_msg['unique'] = cmd_msg.get('unique', True)
         return cmd_msg
 
-@register_command(parent_name = "conv")
+@register_command(parent_name="conv")
 class ConvAddCommand(Command):
     _op_name = "add"
     def __init__(self):
@@ -160,7 +160,7 @@ class ConvAddCommand(Command):
     def build(self, cmd_msg):
         return cmd_msg
 
-@register_command(parent_name = "conv")
+@register_command(parent_name="conv")
 class ConvRemoveCommand(Command):
     _op_name = "remove"
     def __init__(self):
@@ -176,7 +176,7 @@ class SessionCommand(CommandWithOp):
     def __init__(self):
         super().__init__(SessionCommand._name)
 
-@register_command(parent_name = "session")
+@register_command(parent_name="session")
 class SessionOpenCommand(Command):
     _op_name = "open"
     def __init__(self):
@@ -188,7 +188,7 @@ class SessionOpenCommand(Command):
         cmd_msg['configBitmap'] = 0xFFFF
         return cmd_msg
 
-@register_command(parent_name = "session")
+@register_command(parent_name="session")
 class SessionCloseCommand(Command):
     _op_name = "close"
     def __init__(self):
