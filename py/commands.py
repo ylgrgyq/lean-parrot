@@ -101,7 +101,10 @@ class RegisteredCommands:
 
     def child_cmd_cls_gen(self):
         for parent_name, cmd_cls in self._childs.items():
-            yield [parent_name, cmd_cls]
+            # From https://stackoverflow.com/questions/25314547/cell-var-from-loop-warning-from-pylint
+            # To by pass the "W0640:Cell variable parent_name defined in loop" warning
+            # we pass parent_name as default value to param p
+            yield from map(lambda c, p=parent_name: [p, c], cmd_cls)
 
 COMMANDS = RegisteredCommands()
 
@@ -120,11 +123,9 @@ def init_commands():
         cmd = parent_cls()
         commands[cmd.name] = cmd
 
-    for parent_name, cmd_classes in COMMANDS.child_cmd_cls_gen():
-        for cmd_cls in cmd_classes:
-            cmd = cmd_cls()
-            parent_cmd = commands[parent_name]
-            parent_cmd.add(cmd)
+    for parent_name, cmd_cls in COMMANDS.child_cmd_cls_gen():
+        cmd = cmd_cls()
+        commands[parent_name].add(cmd)
     return commands
 
 @register_command()
