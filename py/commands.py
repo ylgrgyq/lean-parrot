@@ -16,13 +16,13 @@ def sign(sign_msg, k):
 
 def add_sign(cmd_msg, convid=None, action=None, peerids=None):
     peerid = cmd_msg['peerId']
-    ts = time.time()
+    ts_millis = int(round(time.time() * 1000))
     nonce = cmd_msg.get('nonce', util.generate_id())
     peerid = peerid if convid is None else ':'.join([peerid, convid])
     peerids = '' if peerids is None else ':'.join(sorted(peerids))
-    sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts), nonce])
+    sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts_millis), nonce])
     sign_msg = sign_msg if action is None else ':'.join([sign_msg, action])
-    cmd_msg['t'] = ts
+    cmd_msg['t'] = ts_millis
     cmd_msg['n'] = nonce
     cmd_msg['s'] = sign(sign_msg, config.APP_MASTER_KEY)
     return cmd_msg

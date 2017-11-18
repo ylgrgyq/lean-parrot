@@ -12,7 +12,7 @@ WS_MANAGER = WebSocketManager()
 
 class Client(WebSocketBaseClient):
     def __init__(self, addr, appid, peerid, serializer):
-        super().__init__(addr)
+        super().__init__(addr, heartbeat_freq=5.0)
         self._serializer = serializer
         self._cmd_manager = commands.CommandsManager(appid, peerid)
 

@@ -53,10 +53,12 @@ def start_process():
     clt.connect()
 
     while True:
-        raw_str = input()
         try:
+            raw_str = input()
             cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
             clt.send_msg(cmd_msg_args)
+        except KeyboardInterrupt:
+            break
         except Exception:
             print(colorama.Fore.RED + "Got exception: %s" % traceback.print_exc())
 
