@@ -3,22 +3,33 @@ webSocket Client
 """
 import re
 import json
+import collections
+from threading import Thread
 import commands
 import colorama
 from ws4py.client import WebSocketBaseClient
+from ws4py.websocket import Heartbeat
 from ws4py.manager import WebSocketManager
 
 WS_MANAGER = WebSocketManager()
 
 class Client(WebSocketBaseClient):
-    def __init__(self, addr, appid, peerid, serializer):
-        super().__init__(addr, heartbeat_freq=5.0)
+    def __init__(self, addr, ping_interval_secs, cmd_manager, serializer):
+        super().__init__(addr)
         self._serializer = serializer
-        self._cmd_manager = commands.CommandsManager(appid, peerid)
+        self._cmd_manager = cmd_manager
+        if ping_interval_secs is None:
+            self._ping_interval_secs = 60
+        else:
+            self._ping_interval_secs = ping_interval_secs
 
     def handshake_ok(self):
         print(colorama.Fore.YELLOW + "Handshake OK")
         WS_MANAGER.add(self)
+
+        if self._ping_interval_secs != 0:
+            ping_thread = Thread(target=Heartbeat(self, self._ping_interval_secs).run)
+            ping_thread.start()
 
     def opened(self):
         print(colorama.Fore.YELLOW + "Socket opened")
@@ -46,12 +57,21 @@ class ClientBuilder:
         self._appid = None
         self._peerid = None
         self._addr = None
+        self._ping_interval_secs = None
         self._sub_ptorocol = sub_protocol
         protos = re.split(r'\.', sub_protocol)
         self._protocol = protos[1]
 
     def with_appid(self, appid):
         self._appid = appid
+        return self
+
+    def with_ping_interval_secs(self, interval_secs):
+        self._ping_interval_secs = interval_secs
+        return self
+
+    def disable_ping(self):
+        self._ping_interval_secs = 0
         return self
 
     def with_peerid(self, peerid):
@@ -63,10 +83,11 @@ class ClientBuilder:
         return self
 
     def build(self):
+        cmd_manager = commands.CommandsManager(self._appid, self._peerid)
         serializer = JsonSerializer()
         if self._protocol == 'json':
             serializer = JsonSerializer()
-        return Client(self._addr, self._appid, self._peerid, serializer)
+        return Client(self._addr, self._ping_interval_secs, cmd_manager, serializer)
 
 def client_builder(sub_protocol):
     return ClientBuilder(sub_protocol)
