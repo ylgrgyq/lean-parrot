@@ -4,6 +4,7 @@ webSocket Client
 import re
 import json
 import commands
+import colorama
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 
@@ -16,11 +17,11 @@ class Client(WebSocketBaseClient):
         self._cmd_manager = commands.CommandsManager(appid, peerid)
 
     def handshake_ok(self):
-        print("Handshake OK")
+        print(colorama.Fore.YELLOW + "Handshake OK")
         WS_MANAGER.add(self)
 
     def opened(self):
-        print("Socket opened")
+        print(colorama.Fore.YELLOW + "Socket opened")
 
     def send_msg(self, cmd_msg_args):
         msg = self._cmd_manager.build(cmd_msg_args)
@@ -31,7 +32,7 @@ class Client(WebSocketBaseClient):
         self._cmd_manager.process(self, self._serializer.deserialize(message))
 
     def closed(self, code, reason=None):
-        print("WebSocket closed", code, reason)
+        print(colorama.Fore.YELLOW + "WebSocket closed: %s %s" % (code, reason))
 
 class JsonSerializer:
     def serialize(self, msg):

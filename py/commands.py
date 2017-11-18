@@ -5,6 +5,7 @@ import time
 import json
 import hmac
 import hashlib
+import colorama
 from functools import wraps
 
 import util
@@ -45,7 +46,7 @@ class Command:
         return self._name
 
     def process(self, router, msg):
-        print("< ", json.dumps(msg))
+        print(colorama.Fore.CYAN + "< %s" % json.dumps(msg))
 
     def build(self, cmd_msg):
         return cmd_msg
@@ -207,7 +208,7 @@ class CommandsManager:
         if cmd_in_msg is not None:
             cmd = self.commands.get(cmd_in_msg)
             if cmd is None:
-                print("< ", json.dumps(msg))
+                print(colorama.Fore.CYAN + "< %s" % json.dumps(msg))
             else:
                 cmd.process(router, msg)
         else:

@@ -6,6 +6,7 @@ import traceback
 import readline
 import argparse
 import urllib3
+import colorama
 
 import commands
 import client
@@ -41,7 +42,7 @@ def start_process():
     server_addr = args.server_addr
     if server_addr is None:
         server_addr = get_servers(config.APP_ID, args.is_secure_addr)
-    print("Connecting to %s" % server_addr)
+    print(colorama.Fore.YELLOW + "Connecting to %s" % server_addr)
 
     client.start_wsman()
     clt = client.client_builder(args.protocol) \
@@ -57,11 +58,12 @@ def start_process():
             cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
             clt.send_msg(cmd_msg_args)
         except Exception:
-            print("Got exception", traceback.print_exc())
+            print(colorama.Fore.RED + "Got exception: %s" % traceback.print_exc())
 
     clt.close()
     client.close_wsman()
-    print("Client closed")
+    print(colorama.Fore.GREEN + "Client closed")
 
 if __name__ == "__main__":
+    colorama.init(autoreset=True)
     start_process()
