@@ -141,6 +141,12 @@ class ConvCommand(CommandWithOp):
     def __init__(self):
         super().__init__(ConvCommand._name)
 
+@register_command()
+class BlacklistCommand(CommandWithOp):
+    _name = "blacklist"
+    def __init__(self):
+        super().__init__(BlacklistCommand._name)
+
 @register_command(parent_name="conv")
 class ConvStartCommand(Command):
     _op_name = "start"
@@ -169,6 +175,46 @@ class ConvRemoveCommand(Command):
         super().__init__(ConvRemoveCommand._op_name)
 
     @with_sign(pids_field_name='m', cid_field_name='cid', action_name='kick')
+    def build(self, cmd_msg):
+        return cmd_msg
+
+@register_command(parent_name="conv")
+class ConvAddShutupCommand(Command):
+    _op_name = "add-shutup"
+    def __init__(self):
+        super().__init__(ConvAddShutupCommand._op_name)
+
+    @with_sign(pids_field_name='m', cid_field_name='cid', action_name='shutup')
+    def build(self, cmd_msg):
+        return cmd_msg
+
+@register_command(parent_name="conv")
+class ConvRemoveShutupCommand(Command):
+    _op_name = "remove-shutup"
+    def __init__(self):
+        super().__init__(ConvRemoveShutupCommand._op_name)
+
+    @with_sign(pids_field_name='m', cid_field_name='cid', action_name='unshutup')
+    def build(self, cmd_msg):
+        return cmd_msg
+
+@register_command(parent_name="blacklist")
+class BlacklistBlockShutupCommand(Command):
+    _op_name = "block"
+    def __init__(self):
+        super().__init__(BlacklistBlockShutupCommand._op_name)
+
+    @with_sign(pids_field_name='toPids', cid_field_name='srcCid', action_name='block')
+    def build(self, cmd_msg):
+        return cmd_msg
+
+@register_command(parent_name="blacklist")
+class BlacklistUnblockShutupCommand(Command):
+    _op_name = "unblock"
+    def __init__(self):
+        super().__init__(BlacklistUnblockShutupCommand._op_name)
+
+    @with_sign(pids_field_name='toPids', cid_field_name='srcCid', action_name='unblock')
     def build(self, cmd_msg):
         return cmd_msg
 
