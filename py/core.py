@@ -55,8 +55,11 @@ def start_process():
     while True:
         try:
             raw_str = input()
-            cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
-            clt.send_msg(cmd_msg_args)
+            if len(raw_str) != 0:
+                cmd_msg_args = input_parser.parse_input_cmd_args(raw_str)
+                clt.send_msg(cmd_msg_args)
+            else:
+                print(raw_str)
         except KeyboardInterrupt:
             break
         except Exception:
