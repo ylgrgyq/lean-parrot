@@ -233,7 +233,7 @@ class SessionOpenCommand(Command):
     @with_sign()
     def build(self, cmd_msg):
         cmd_msg['ua'] = cmd_msg.get('ua', config.CLIENT_UA)
-        cmd_msg['configBitmap'] = 0xFFFF
+        cmd_msg['configBitmap'] = int(cmd_msg.get('configBitmap', 0xFFFF))
         return cmd_msg
 
 @register_command(parent_name="session")
