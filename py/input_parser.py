@@ -3,115 +3,169 @@ Functions to parse input from command line
 """
 import json
 
-def skip_whitespaces(pos, a_str):
-    while pos < len(a_str) and a_str[pos].isspace():
-        pos += 1
-    return pos
+_UNSET = object()
 
-def parse_keyword_from_input(pos, input_str):
-    cursor = pos
-    while cursor < len(input_str):
-        char = input_str[cursor]
-        if char.isalpha():
-            cursor += 1
-        elif char.isspace():
-            key = input_str[pos:cursor]
-            cursor = skip_whitespaces(cursor, input_str)
-            return [cursor, key]
+
+class Lexer(object):
+    def __init__(self, input_str):
+        self._input_str = input_str
+        self._pos = 0
+        self._skip_whitespaces()
+
+    def next_msg(self):
+        ret = dict()
+        while not self._isoverflow():
+            key = self._next_keyword()
+            if key is None:
+                raise RuntimeError(
+                    "parse keyword in dict failed. input: %s" % self._input_str)
+
+            value = self._next_value()
+            if value is None:
+                raise RuntimeError(
+                    "parse value in dict failed. input: %s" % self._input_str)
+            elif value == _UNSET:
+                value = None
+
+            ret[key] = value
+
+            self._skip_whitespaces()
+        return ret
+
+    def _isoverflow(self):
+        return self._pos >= len(self._input_str)
+
+    def _skip_whitespaces(self):
+        while not self._isoverflow() and self._input_str[self._pos].isspace():
+            self._pos += 1
+
+    def _next_keyword(self):
+        self._skip_whitespaces()
+
+        key = self._next_consecutive_literals(lambda x: x.isalpha())
+        if key and not self._input_str[self._pos - 1].isspace():
+            raise RuntimeError(format(
+                "Invalid char '%s' for keyword in input: \"%s\"" % (self._input_str[self._pos - 1], self._input_str)))
+        return key
+
+    def _next_value(self):
+        self._skip_whitespaces()
+        if self._isoverflow():
+            return None
+
+        char = self._input_str[self._pos]
+        if char == '{':
+            dict_end_pos = self._search_block_end('{', '}')
+            v = Lexer(self._input_str[self._pos + 1:dict_end_pos]).next_msg()
+            self._pos = dict_end_pos + 1
+            return v
+        elif char == '[':
+            return self._next_list()
+        elif char in ['\'', '\"']:
+            return self._next_string()
         else:
-            raise RuntimeError("Invalid keyword in input %s" % input_str)
+            literals = self._next_consecutive_literals(
+                lambda x: not x.isspace())
+            if literals.lower() == 'true':
+                return True
+            elif literals.lower() == 'false':
+                return False
+            elif literals.lower() == 'nil':
+                return _UNSET
+            else:
+                v = None
+                try:
+                    v = int(literals)
+                except ValueError:
+                    try:
+                        v = float(literals)
+                    except ValueError:
+                        v = literals
+                return v
 
-def parse_json(pos, input_str):
-    brackets_count = 1
-    cursor = pos + 1
-    while cursor < len(input_str):
-        if input_str[cursor] == '{':
-            brackets_count += 1
-        elif input_str[cursor] == '}':
-            brackets_count -= 1
-            if brackets_count == 0:
-                cursor = skip_whitespaces(cursor + 1, input_str)
-                json_str = input_str[pos:cursor].replace('\'', '\"')
-                return [cursor, json.loads(json_str)]
-        cursor += 1
+    def _next_list(self):
+        ret = list()
+        block_end_pos = self._search_block_end('[', ']')
 
-    raise RuntimeError("Invalid JSON string in input: %s" % input_str)
-
-def parse_list(pos, input_str):
-    ret = list()
-    cursor = pos + 1
-    while cursor < len(input_str):
-        if input_str[cursor] == ']':
-            cursor = skip_whitespaces(cursor + 1, input_str)
-            return [cursor, ret]
-        else:
-            [cursor, value] = parse_value_from_input(cursor, input_str)
+        self._pos += 1
+        list_vals = Lexer(self._input_str[self._pos:block_end_pos])
+        while not list_vals._isoverflow():
+            value = list_vals._next_value()
+            if value == _UNSET:
+                value = None
             ret.append(value)
 
-    raise RuntimeError("Missing ']' in list. input: %s" % input_str)
+            list_vals._skip_whitespaces()
 
-def parse_string(pos, input_str):
-    quote_char = input_str[pos]
-    cursor = pos + 1
-    while cursor < len(input_str) and input_str[cursor] != quote_char:
-        cursor += 1
+        self._pos = block_end_pos + 1
+        return ret
 
-    ret_str = input_str[pos + 1:cursor]
-    if cursor < len(input_str):
-        cursor = skip_whitespaces(cursor + 1, input_str)
-    return [cursor, ret_str]
+    def _next_string(self):
+        string_end_pos = self._search_block_end()
+        ret_str = self._input_str[self._pos + 1:string_end_pos]
+        self._pos = string_end_pos + 1
+        return ret_str
 
-def parse_value_as_string(pos, input_str):
-    cursor = pos
-    while cursor < len(input_str) \
-          and not input_str[cursor].isspace() \
-          and input_str[cursor] not in ['}', ']']:
-        cursor += 1
-    return [skip_whitespaces(cursor, input_str), input_str[pos:cursor]]
+    def _search_block_end(self, left_mark=None, right_mark=None):
+        if left_mark is None:
+            left_mark = self._input_str[self._pos]
 
-def char_is_space_or_out_of_string(char_pos, input_str):
-    return char_pos >= len(input_str) or input_str[char_pos].isspace()
+        if right_mark is None:
+            right_mark = left_mark
 
-def try_parse_boolean(pos, input_str):
-    cursor = pos
-    input_len = len(input_str)
-    ret = None
-    if cursor + 4 <= input_len and \
-       input_str[cursor:cursor + 4].lower() == 'true' and \
-       char_is_space_or_out_of_string(cursor + 4, input_str):
-        cursor += 4
-        ret = True
-    elif cursor + 5 <= input_len and \
-         input_str[cursor:cursor + 5].lower() == 'false' and \
-         char_is_space_or_out_of_string(cursor + 5, input_str):
-        cursor += 5
-        ret = False
+        pair_count = 1
+        cursor = self._pos + 1
+        while cursor < len(self._input_str):
+            if self._input_str[cursor] == right_mark:
+                pair_count -= 1
+                if pair_count == 0:
+                    break
+            elif self._input_str[cursor] == left_mark:
+                pair_count += 1
+            cursor += 1
+        if cursor >= len(self._input_str):
+            raise ValueError(
+                format("block not closed in input: \"%s\"" % self._input_str))
 
-    if cursor == pos:
-        return parse_value_as_string(pos, input_str)
-    else:
-        cursor = skip_whitespaces(cursor, input_str)
-        return [cursor, ret]
+        return cursor
 
-def parse_value_from_input(pos, input_str):
-    cursor = pos
-    if input_str[cursor] == '{':
-        return parse_json(cursor, input_str)
-    elif input_str[cursor] == '[':
-        return parse_list(cursor, input_str)
-    elif input_str[cursor] in ['\'', '\"']:
-        return parse_string(cursor, input_str)
-    elif input_str[cursor].lower() in ['t', 'f']:
-        return try_parse_boolean(cursor, input_str)
-    else:
-        return parse_value_as_string(cursor, input_str)
+    def _next_consecutive_literals(self, filter_fn):
+        cursor = self._pos
+        while cursor < len(self._input_str):
+            char = self._input_str[cursor]
+            if filter_fn(char):
+                cursor += 1
+            else:
+                break
+
+        literals = self._input_str[self._pos:cursor]
+        self._pos = cursor + 1
+        return literals
+
 
 def parse_input_cmd_args(input_str):
-    ret = dict()
-    pos = skip_whitespaces(0, input_str)
-    while pos < len(input_str):
-        [nxt_pos, key] = parse_keyword_from_input(pos, input_str)
-        [nxt_pos, value] = parse_value_from_input(nxt_pos, input_str)
-        pos = nxt_pos
-        ret[key] = value
-    return ret
+    return Lexer(input_str).next_msg()
+
+
+def assert_equal(expect, actual):
+    if expect != actual:
+        raise AssertionError(format(
+            "assert equal failed. expect: %s actual: %s" % (expect, actual)))
+
+
+if __name__ == "__main__":
+    assert_equal({'cmd': 'session', 'op': 'open', 'appId': 'hahah"a"h\'a\'ha', 't': 23232323, 'unique': True, 'cid': None, 'live': False},
+                 Lexer("cmd 'session' op 'open' appId hahah\"a\"h\'a\'ha \t t     23232323 unique true cid nil live False").next_msg())
+
+    assert_equal({'attr': {'level': 100, 'unique': True, 'cid': None}},
+                 Lexer("attr {level 100 unique true  cid    nil}").next_msg())
+
+    assert_equal({'attr': {'level': 100, 'unique': True, 'inner': {'gender': 'male', 'cid': None}}},
+                 Lexer("attr {level 100 unique true  inner {gender male cid nil}}").next_msg())
+
+    assert_equal({'attr': {'level': 100, 'unique': True, 'inner': {'gender': 'male', 'cid': None, 'list': ['asdf', 111]}}},
+                 Lexer("attr {level 100 unique true  inner {gender male cid nil   list [asdf 111]}}").next_msg())
+
+    assert_equal({'attr': {'level': 100.0, 'inner': {'gender': 'male', 'info': {'age': 100.0, 'company': 'MS'},
+                                                     'list': ['asdf', 111.0, True, None, [666, {'haha': 'nihao'}]], 'niu': False}}},
+                 Lexer("attr {  level 100 inner {gender male info {  age 100 company MS} list [asdf 111 True nil [ 666 {haha nihao}  ]  ] niu False}}").next_msg())
