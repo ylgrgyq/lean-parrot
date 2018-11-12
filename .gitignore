@@ -13,3 +13,5 @@ pom.xml.asc
 *.iml
 .idea/
 .vscode/
+node_modules/
+config.ini

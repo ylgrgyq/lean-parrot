@@ -11,8 +11,10 @@ from functools import wraps
 import util
 import config
 
+
 def sign(sign_msg, k):
     return hmac.new(k.encode('utf-8'), sign_msg.encode('utf-8'), hashlib.sha1).digest().hex()
+
 
 def add_sign(cmd_msg, convid=None, action=None, peerids=None):
     peerid = cmd_msg['peerId']
@@ -20,22 +22,26 @@ def add_sign(cmd_msg, convid=None, action=None, peerids=None):
     nonce = cmd_msg.get('nonce', util.generate_id())
     peerid = peerid if convid is None else ':'.join([peerid, convid])
     peerids = '' if peerids is None else ':'.join(sorted(peerids))
-    sign_msg = ':'.join([config.APP_ID, peerid, peerids, str(ts_millis), nonce])
+    sign_msg = ':'.join(
+        [config.APP_ID, peerid, peerids, str(ts_millis), nonce])
     sign_msg = sign_msg if action is None else ':'.join([sign_msg, action])
     cmd_msg['t'] = ts_millis
     cmd_msg['n'] = nonce
     cmd_msg['s'] = sign(sign_msg, config.APP_MASTER_KEY)
     return cmd_msg
 
-def with_sign(cid_field_name = None, pids_field_name = None, action_name = None):
+
+def with_sign(cid_field_name=None, pids_field_name=None, action_name=None):
     def sign_decorator(fn):
         @wraps(fn)
         def wrap_sign(self, cmd_msg):
             [cid, pids] = map(cmd_msg.get, [cid_field_name, pids_field_name])
-            cmd_msg = add_sign(cmd_msg, convid=cid, peerids=pids, action=action_name)
+            cmd_msg = add_sign(cmd_msg, convid=cid,
+                               peerids=pids, action=action_name)
             return fn(self, cmd_msg)
         return wrap_sign
     return sign_decorator
+
 
 class Command:
     def __init__(self, name):
@@ -45,14 +51,18 @@ class Command:
     def name(self):
         return self._name
 
-    def process(self, router, msg):
-        print(colorama.Fore.CYAN + "< %s" % json.dumps(msg))
+    def preprocess(self, msg):
+        return msg
 
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
 
-    def is_interactive_cmd(self):
+    def get_respond(self, msg):
+        return None
+
+    def need_serial_id(self):
         return True
+
 
 class CommandWithOp(Command):
     def __init__(self, name):
@@ -66,22 +76,33 @@ class CommandWithOp(Command):
     def remove(self, sub_command):
         self.sub_commands.pop(sub_command.name, None)
 
-    def process(self, router, msg):
+    def preprocess(self, msg):
+        msg = super().preprocess(msg)
+
         op_field = msg.get('op')
         if op_field is None or op_field not in self.sub_commands:
-            super().process(router, msg)
-        else:
-            self.sub_commands[op_field].process(router, msg)
+            return msg
 
-    def build(self, cmd_msg):
+        return self.sub_commands[op_field].preprocess(msg)
+
+    def get_respond(self, msg):
+        op_field = msg.get('op')
+        if op_field is None or op_field not in self.sub_commands:
+            return super().get_respond(msg)
+
+        return self.sub_commands[op_field].get_respond(msg)
+
+    def complate_msg(self, common_args, cmd_msg):
         op_field = cmd_msg.get('op')
         msg = None
         if op_field is None or self.sub_commands.get(op_field) is None:
             msg = cmd_msg
         else:
-            msg = self.sub_commands[op_field].build(cmd_msg)
+            msg = self.sub_commands[op_field].complate_msg(
+                common_args, cmd_msg)
         msg['cmd'] = self.name
         return msg
+
 
 class RegisteredCommands:
     def __init__(self):
@@ -107,7 +128,9 @@ class RegisteredCommands:
             # we pass parent_name as default value to param p
             yield from map(lambda c, p=parent_name: [p, c], cmd_cls)
 
+
 COMMANDS = RegisteredCommands()
+
 
 def register_command(parent_name=None):
     def wrapper(cls):
@@ -117,6 +140,7 @@ def register_command(parent_name=None):
             COMMANDS.add_child_cmd_cls(parent_name, cls)
         return cls
     return wrapper
+
 
 def init_commands():
     commands = dict()
@@ -129,148 +153,194 @@ def init_commands():
         commands[parent_name].add(cmd)
     return commands
 
+
 @register_command()
 class DirectCommand(Command):
     _name = "direct"
+
     def __init__(self):
         super().__init__(DirectCommand._name)
+
+    def preprocess(self, msg):
+        msg = super().preprocess(msg)
+        if msg.get('msg') and not isinstance(msg['msg'], str):
+            msg['msg'] = msg['msg'].decode('utf-8')
+        return msg
+
 
 @register_command()
 class ConvCommand(CommandWithOp):
     _name = "conv"
+
     def __init__(self):
         super().__init__(ConvCommand._name)
+
 
 @register_command()
 class BlacklistCommand(CommandWithOp):
     _name = "blacklist"
+
     def __init__(self):
         super().__init__(BlacklistCommand._name)
+
 
 @register_command(parent_name="conv")
 class ConvStartCommand(Command):
     _op_name = "start"
+
     def __init__(self):
         super().__init__(ConvStartCommand._op_name)
 
     @with_sign(pids_field_name='m')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         cmd_msg['unique'] = cmd_msg.get('unique', True)
         return cmd_msg
+
 
 @register_command(parent_name="conv")
 class ConvAddCommand(Command):
     _op_name = "add"
+
     def __init__(self):
         super().__init__(ConvAddCommand._op_name)
 
     @with_sign(pids_field_name='m', cid_field_name='cid', action_name='invite')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command(parent_name="conv")
 class ConvRemoveCommand(Command):
     _op_name = "remove"
+
     def __init__(self):
         super().__init__(ConvRemoveCommand._op_name)
 
     @with_sign(pids_field_name='m', cid_field_name='cid', action_name='kick')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command(parent_name="conv")
 class ConvAddShutupCommand(Command):
     _op_name = "add-shutup"
+
     def __init__(self):
         super().__init__(ConvAddShutupCommand._op_name)
 
     @with_sign(pids_field_name='m', cid_field_name='cid', action_name='shutup')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command(parent_name="conv")
 class ConvRemoveShutupCommand(Command):
     _op_name = "remove-shutup"
+
     def __init__(self):
         super().__init__(ConvRemoveShutupCommand._op_name)
 
     @with_sign(pids_field_name='m', cid_field_name='cid', action_name='unshutup')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command(parent_name="blacklist")
 class BlacklistBlockShutupCommand(Command):
     _op_name = "block"
+
     def __init__(self):
         super().__init__(BlacklistBlockShutupCommand._op_name)
 
     @with_sign(pids_field_name='toPids', cid_field_name='srcCid', action_name='block')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command(parent_name="blacklist")
 class BlacklistUnblockShutupCommand(Command):
     _op_name = "unblock"
+
     def __init__(self):
         super().__init__(BlacklistUnblockShutupCommand._op_name)
 
     @with_sign(pids_field_name='toPids', cid_field_name='srcCid', action_name='unblock')
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
         return cmd_msg
+
 
 @register_command()
 class SessionCommand(CommandWithOp):
     _name = "session"
+
     def __init__(self):
         super().__init__(SessionCommand._name)
+
+    def complate_msg(self, common_args, cmd_msg):
+        cmd_msg['appId'] = common_args['app_id']
+        cmd_msg['peerId'] = common_args['peer_id']
+        cmd_msg = super().complate_msg(common_args, cmd_msg)
+        return cmd_msg
+
 
 @register_command(parent_name="session")
 class SessionOpenCommand(Command):
     _op_name = "open"
+
     def __init__(self):
         super().__init__(SessionOpenCommand._op_name)
 
     @with_sign()
-    def build(self, cmd_msg):
+    def complate_msg(self, common_args, cmd_msg):
+        add_sign(cmd_msg)
         cmd_msg['ua'] = cmd_msg.get('ua', config.CLIENT_UA)
         cmd_msg['configBitmap'] = int(cmd_msg.get('configBitmap', 0xFFFF))
         return cmd_msg
 
+
 @register_command(parent_name="session")
 class SessionCloseCommand(Command):
     _op_name = "close"
+
     def __init__(self):
         super().__init__(SessionCloseCommand._op_name)
+
 
 class CommandsManager:
     def __init__(self, appid, peerid):
         self.commands = init_commands()
         self._next_serial_id = 1
         self._appid = appid
+        self._common_args = {'app_id': appid,
+                             'peer_id': peerid}
         self._peerid = peerid
 
-    def process(self, router, msg):
-        cmd_in_msg = msg.get('cmd')
-        if cmd_in_msg is not None:
-            cmd = self.commands.get(cmd_in_msg)
-            if cmd is None:
-                print(colorama.Fore.CYAN + "< %s" % json.dumps(msg))
-            else:
-                cmd.process(router, msg)
+    def get_respond_msg(self, msg):
+        command = self._get_command(msg)
+        if command is not None:
+            return command.get_respond(msg)
+        return None
+
+    def preprocess(self, msg):
+        command = self._get_command(msg)
+        if command is not None:
+            return command.preprocess(msg)
+        return msg
+
+    def complate_msg(self, cmd_msg):
+        command = self._get_command(cmd_msg)
+        if command is None:
+            return cmd_msg
+
+        msg = command.complate_msg(self._common_args, cmd_msg)
+        if command.need_serial_id():
+            msg['i'] = self._next_serial_id
+            self._next_serial_id += 1
+        return msg
+
+    def _get_command(self, msg):
+        cmd = msg.get('cmd')
+        if cmd is not None:
+            return self.commands.get(cmd)
         else:
             raise RuntimeError("Receive msg without 'cmd': %s" % msg)
-
-    def build(self, cmd_msg):
-        cmd = cmd_msg['cmd']
-        cmd_builder = self.commands.get(cmd)
-        if cmd_builder is None:
-            cmd_msg['cmd'] = cmd
-            return cmd_msg
-        else:
-            cmd_msg['appId'] = self._appid
-            cmd_msg['peerId'] = self._peerid
-            msg = cmd_builder.build(cmd_msg)
-            if cmd_builder.is_interactive_cmd():
-                msg['i'] = self._next_serial_id
-                self._next_serial_id += 1
-            return msg
