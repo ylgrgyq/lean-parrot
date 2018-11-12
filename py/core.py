@@ -30,7 +30,7 @@ def get_servers(secure=True):
     with requests.Session() as session:
         session.mount(auth_url, HTTPAdapter(max_retries=3))
         resp = session.get(auth_url, params=payload, timeout=1)
-        LOG.info("get router link got response %s" % resp.json())
+        LOG.info("get route got response %s" % resp.json())
         return resp.json()["server"]
 
 
@@ -86,7 +86,7 @@ def start_process():
 def prepare_history_file():
     # copied from https://docs.python.org/3/library/readline.html
     histfile = os.path.join(
-        os.path.expanduser("~"), ".game_command_line_testing_tool_history")
+        os.path.expanduser("~"), ".lean_parrot_command_line_testing_tool_history")
     try:
         readline.read_history_file(histfile)
         # default history len is -1 (infinite), which may grow unruly

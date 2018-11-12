@@ -8,7 +8,8 @@ APP_ID = None
 APP_MASTER_KEY = None
 ROUTER_URL = None
 CLIENT_UA = None
-DEFAULT_PROTOCOL = 'json.1'
+DEFAULT_PROTOCOL = 'lc.json.3'
+AUTO_RESPOND = False
 
 
 def init_config(env):

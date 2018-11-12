@@ -16,8 +16,8 @@ def sign(sign_msg, k):
     return hmac.new(k.encode('utf-8'), sign_msg.encode('utf-8'), hashlib.sha1).digest().hex()
 
 
-def add_sign(cmd_msg, convid=None, action=None, peerids=None):
-    peerid = cmd_msg['peerId']
+def add_sign(common_args, cmd_msg, convid=None, action=None, peerids=None):
+    peerid = common_args['peerId']
     ts_millis = int(round(time.time() * 1000))
     nonce = cmd_msg.get('nonce', util.generate_id())
     peerid = peerid if convid is None else ':'.join([peerid, convid])
@@ -34,11 +34,11 @@ def add_sign(cmd_msg, convid=None, action=None, peerids=None):
 def with_sign(cid_field_name=None, pids_field_name=None, action_name=None):
     def sign_decorator(fn):
         @wraps(fn)
-        def wrap_sign(self, cmd_msg):
+        def wrap_sign(self, common_args, cmd_msg):
             [cid, pids] = map(cmd_msg.get, [cid_field_name, pids_field_name])
-            cmd_msg = add_sign(cmd_msg, convid=cid,
+            cmd_msg = add_sign(common_args, cmd_msg, convid=cid,
                                peerids=pids, action=action_name)
-            return fn(self, cmd_msg)
+            return fn(self, common_args, cmd_msg)
         return wrap_sign
     return sign_decorator
 
@@ -167,6 +167,12 @@ class DirectCommand(Command):
             msg['msg'] = msg['msg'].decode('utf-8')
         return msg
 
+    def get_respond(self, msg):
+        if config.AUTO_RESPOND:
+            return {'cmd': 'ack', 'id': msg.get('id'), 'timestamp': msg.get('timestamp'), 'cid': msg.get('cid')}
+        else:
+            return None
+
 
 @register_command()
 class ConvCommand(CommandWithOp):
@@ -277,8 +283,8 @@ class SessionCommand(CommandWithOp):
         super().__init__(SessionCommand._name)
 
     def complate_msg(self, common_args, cmd_msg):
-        cmd_msg['appId'] = common_args['app_id']
-        cmd_msg['peerId'] = common_args['peer_id']
+        cmd_msg['appId'] = common_args['appId']
+        cmd_msg['peerId'] = common_args['peerId']
         cmd_msg = super().complate_msg(common_args, cmd_msg)
         return cmd_msg
 
@@ -292,7 +298,6 @@ class SessionOpenCommand(Command):
 
     @with_sign()
     def complate_msg(self, common_args, cmd_msg):
-        add_sign(cmd_msg)
         cmd_msg['ua'] = cmd_msg.get('ua', config.CLIENT_UA)
         cmd_msg['configBitmap'] = int(cmd_msg.get('configBitmap', 0xFFFF))
         return cmd_msg
@@ -311,8 +316,8 @@ class CommandsManager:
         self.commands = init_commands()
         self._next_serial_id = 1
         self._appid = appid
-        self._common_args = {'app_id': appid,
-                             'peer_id': peerid}
+        self._common_args = {'appId': appid,
+                             'peerId': peerid}
         self._peerid = peerid
 
     def get_respond_msg(self, msg):

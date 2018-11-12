@@ -7,9 +7,8 @@ import collections
 from threading import Thread, Event
 
 import colorama
-from ws4py.client import WebSocketBaseClient
+from ws4py.client.threadedclient import WebSocketClient
 from ws4py.websocket import Heartbeat
-from ws4py.manager import WebSocketManager
 from ws4py.messaging import BinaryMessage
 
 import util
@@ -20,12 +19,10 @@ LOG = util.get_logger('client')
 
 OPENED_CLIENTS = []
 
-WS_MANAGER = WebSocketManager()
 
-
-class Client(WebSocketBaseClient):
-    def __init__(self, addr, peer_id, ping_interval_secs, cmd_manager, serializer, protocol="json.1"):
-        super().__init__(addr)
+class Client(WebSocketClient):
+    def __init__(self, addr, peer_id, ping_interval_secs, cmd_manager, serializer, protocol="lc.json.3"):
+        super(Client, self).__init__(addr, protocols=[protocol])
         self._peer_id = peer_id
         self._serializer = serializer
         self._cmd_manager = cmd_manager
@@ -118,6 +115,10 @@ class Client(WebSocketBaseClient):
 
         LOG.info(colorama.Fore.CYAN + "%s < %s" %
                  (self._peer_id, json.dumps(msg)))
+
+        respond = self._cmd_manager.get_respond_msg(msg)
+        if respond is not None:
+            self.send_msg(respond)
 
         if self._expect_msgs_list:
             [expect_resp, e] = self._expect_msgs_list.pop()
